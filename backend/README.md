@@ -27,6 +27,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Swagger UI: <http://localhost:8000/docs>
 
+
 ## 4. Test bằng curl
 
 ```bash
@@ -58,20 +59,15 @@ curl -X POST http://localhost:8000/api/collect \
 | Handle           | `@sontungmtp`                                      |
 | Keyword          | `review điện thoại`, `#shopee`, …                  |
 
-## 5. Nối frontend
+## 5. Chạy frontend đã nối với backend
 
-Trong `frontend/index.html`, thay `generateMock()` bằng:
+Khởi động backend theo bước 3, sau đó mở `../frontend/index.html` bằng trình duyệt. Nút
+**Thu thập** gửi cấu hình đến `http://localhost:8000/api/collect`; kết quả hiển thị
+và xuất CSV là dữ liệu nhận từ YouTube Data API. Hiện backend chỉ hỗ trợ YouTube.
 
-```js
-const res  = await fetch('http://localhost:8000/api/collect', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(configObject()),
-});
-const data = await res.json();
-state.results = data.results;
-renderResults();
-```
+Nếu thay đổi địa chỉ hoặc cổng backend, cập nhật `COLLECT_API_URL` trong
+`frontend/index.html`. Nếu frontend được phục vụ từ một origin khác, thêm origin đó
+vào `CORS_ORIGINS` trong `backend/.env` rồi khởi động lại backend.
 
 ## 6. Quỹ đạo mở rộng sau này
 

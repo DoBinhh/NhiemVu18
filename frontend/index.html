@@ -177,6 +177,8 @@
   .bar{height:8px;border-radius:999px;background:#0d1728;overflow:hidden;border:1px solid var(--line);}
   .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b8cff,#22d3a6);transition:width .18s;}
   .progress .txt{font-size:12.5px;color:var(--muted);}
+  .progress.on .bar > i{width:35%;animation:progress-indeterminate 1.2s ease-in-out infinite alternate;}
+  @keyframes progress-indeterminate{from{transform:translateX(0)}to{transform:translateX(185%)}}
 
   .table-wrap{flex:1;overflow:auto;padding:12px 16px 18px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -216,10 +218,10 @@
     <div class="logo">CC</div>
     <div>
       <h1>Comment Collector</h1>
-      <p>Thu thập bình luận chứa từ viết tắt · YouTube · Facebook · TikTok · Shopee · Threads</p>
+      <p>Thu thập bình luận chứa từ viết tắt · Hiện hỗ trợ YouTube</p>
     </div>
   </div>
-  <div class="tag-demo">Giao diện demo · chưa nối backend</div>
+  <div class="tag-demo">Đã nối YouTube API</div>
 </header>
 
 <main class="layout">
@@ -365,8 +367,7 @@
 
 <script>
 /* =========================================================
-   Comment Collector — UI demo
-   Backend API dự kiến: POST /api/collect  (body = state.config)
+   Comment Collector — frontend gọi backend YouTube
    ========================================================= */
 
 const $ = (s) => document.querySelector(s);
@@ -375,10 +376,6 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 /* ---------- Dữ liệu nền tảng ---------- */
 const PLATFORMS = [
   { id:'youtube',  name:'YouTube',  icon:'▶', hint:'Video · Shorts · Cộng đồng', color:'#ff4d5e' },
-  { id:'facebook', name:'Facebook', icon:'f', hint:'Fanpage · Nhóm · Bài viết',   color:'#4b8bff' },
-  { id:'tiktok',   name:'TikTok',   icon:'♪', hint:'Video · Bình luận cấp 2',    color:'#2ff0e4' },
-  { id:'shopee',   name:'Shopee',   icon:'S', hint:'Đánh giá sản phẩm',          color:'#ff7a45' },
-  { id:'threads',  name:'Threads',  icon:'@', hint:'Bài đăng · Trả lời',         color:'#c9d4ea' },
 ];
 
 /* ---------- Từ viết tắt ---------- */
@@ -416,6 +413,8 @@ const state = {
   sort: 'newest',
   results: [],
 };
+
+const COLLECT_API_URL = 'http://localhost:8000/api/collect';
 
 const today = new Date();
 const dateInput = (d) => d.toISOString().slice(0, 10);
@@ -483,17 +482,6 @@ function escHtml(s){
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function findWords(text, re){
-  if (!re) return [];
-  const found = new Set();
-  let m; re.lastIndex = 0;
-  while ((m = re.exec(text)) !== null){
-    found.add(m[0].toLowerCase());
-    if (m[0].length === 0) re.lastIndex++;
-  }
-  return [...found];
-}
-
 function highlight(text, words){
   if (!words.length) return escHtml(text);
   const re = buildRegex(words, 'part');
@@ -509,74 +497,12 @@ function highlight(text, words){
 }
 
 /* =========================================================
-   DỮ LIỆU MINH HOẠ (thay bằng dữ liệu API thật)
-   ========================================================= */
-const SAMPLE = [
-  { author:'linh.nguyen',   text:'ngta có nhà lầu xe hơi rồi nên cx chả cần mấy cái này đâu mn ạ', likes:128 },
-  { author:'tuan.anh97',    text:'sp này dùng có đc ko shop? e đang tính mua mà sợ hok hợp da', likes:64 },
-  { author:'mythu.2402',    text:'mn ơi cho m hỏi cái này vs ạ, m mới tập tành lm video thôi', likes:41 },
-  { author:'hoangnam',      text:'ns thật là m thấy cái này ko đáng tiền, đc cái mã đẹp thôi', likes:203 },
-  { author:'quynh.bui',     text:'trc đây mik cx dùng r, ns chung là ổn trong tầm giá này', likes:87 },
-  { author:'shopreview.vn', text:'ib shop để đc tư vấn thêm nha, rep nhanh lắm luôn', likes:12 },
-  { author:'kiet.tran',     text:'j z trời, giá này mà cx bán đc à, ngta mua chỗ khác rẻ hơn nhiều', likes:311 },
-  { author:'haianh.9x',     text:'theo mik thì mn nên đọc kỹ stt trc khi mua nha, kẻo tiếc tiền', likes:55 },
-  { author:'vminh.channel', text:'bik j đâu, cứ thử đi r bik, tks shop đã tư vấn nhiệt tình', likes:9 },
-  { author:'ngocdiep',      text:'hok có tiền mua đt mới nên m dùng tạm cái này, cx bt thôi mn', likes:76 },
-  { author:'long.nguyen',   text:'ace cho e hỏi sđt shop vs, e gọi mà ko đc ai bắt máy', likes:3 },
-  { author:'thuylinh98',    text:'@user rep cmt của m đi, đợi mãi chả thấy trả lời j cả', likes:18 },
-  { author:'bichngoc.shop', text:'này là hàng fake hay auth z shop, mn cho mik xin review vs', likes:142 },
-  { author:'duy.manh',      text:'mình thấy giá này quá cao so vs chất lượng, nx thêm là ship hơi lâu', likes:98 },
-  { author:'trang.pt',      text:'shop ơi sp này còn hàng ko, e đặt 2 cái đc ko ạ', likes:7 },
-  { author:'anhtuan.dev',   text:'coi xong clip mà thấy ns xàm, k hay j cả, phí thời gian', likes:64 },
-  { author:'lethuong',      text:'ai bk mua ở đâu rẻ ko, chỉ mik vs, đang cần gấp', likes:22 },
-  { author:'phuong.thaovn', text:'mn ơi cái này dùng oke trong tầm giá, nên thử nha ace', likes:133 },
-  { author:'minhchau.2k',   text:'thik cái tone màu này ghê, đc cái lên hình xinh cực mn ạ', likes:290 },
-  { author:'tien.dat',      text:'đt gì mà pin tụt như tụt quần, hok đáng mua đâu mn, đừng phí tiền', likes:410 },
-  { author:'huyhoang.k',    text:'mua ở đây lần 2 r, ship nhanh, nv tư vấn cx dễ thương', likes:35 },
-  { author:'nga.pham',      text:'mn cho e xin link vs ạ, e tìm mãi hok thấy chỗ bán', likes:11 },
-];
-
-function generateMock(){
-  const re = buildRegex(state.selected, state.match);
-  const skipLinks = $('#optSkipLinks').checked;
-  const dedup = $('#optDedup').checked;
-
-  let out = [];
-  const seen = new Set();
-
-  SAMPLE.forEach((c, i) => {
-    if (skipLinks && /https?:\/\/|www\./i.test(c.text)) return;
-    const words = findWords(c.text, re);
-    if (!words.length) return;
-    if (dedup){
-      const key = c.text.toLowerCase().trim();
-      if (seen.has(key)) return;
-      seen.add(key);
-    }
-    const d = new Date(min5y.getTime() + Math.random() * (today.getTime() - min5y.getTime()));
-    out.push({
-      id: i + 1,
-      author: c.author,
-      text: c.text,
-      likes: c.likes,
-      matched: words,
-      platform: state.platform,
-      date: d,
-    });
-  });
-
-  if (state.sort === 'newest') out.sort((a, b) => b.date - a.date);
-  if (state.sort === 'oldest') out.sort((a, b) => a.date - b.date);
-  if (state.sort === 'likes')  out.sort((a, b) => b.likes - a.likes);
-
-  return out.slice(0, Math.min(Number($('#limit').value) || 300, 200));
-}
-
-/* =========================================================
    RENDER KẾT QUẢ
    ========================================================= */
-const fmtDate = (d) =>
-  `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+const fmtDate = (d) => {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '—';
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
 
 function renderResults(){
   const wrap = $('#tableWrap');
@@ -636,15 +562,25 @@ function updateStats(){
 /* =========================================================
    HÀNH ĐỘNG
    ========================================================= */
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
 async function collect(){
+  if (state.platform !== 'youtube'){
+    toast('Backend hiện chỉ hỗ trợ YouTube', 'warn');
+    return;
+  }
   if (!state.selected.size){
     toast('Hãy chọn ít nhất 1 từ viết tắt để lọc', 'warn');
     return;
   }
+  if (!$('#source').value.trim()){
+    toast('Vui lòng nhập video, kênh, handle hoặc từ khóa YouTube', 'warn');
+    return;
+  }
   if (!$('#fromDate').value || !$('#toDate').value){
     toast('Vui lòng chọn khoảng thời gian', 'warn');
+    return;
+  }
+  if ($('#fromDate').value > $('#toDate').value){
+    toast('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc', 'warn');
     return;
   }
 
@@ -656,28 +592,41 @@ async function collect(){
   const btn = $('#btnCollect');
   btn.disabled = true;
   $('#progress').classList.add('on');
+  $('#progressTxt').textContent = 'Đang gửi yêu cầu và thu thập bình luận từ YouTube...';
 
-  const steps = [
-    'Đang xác thực nguồn dữ liệu...',
-    `Đang thu thập bình luận từ ${PLATFORMS.find(p => p.id === state.platform).name}...`,
-    'Đang lọc bình luận chứa từ viết tắt...',
-    'Đang loại bỏ trùng lặp & spam...',
-    'Hoàn tất!',
-  ];
+  try{
+    const response = await fetch(COLLECT_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(configObject()),
+    });
+    const data = await response.json();
+    if (!response.ok){
+      const detail = typeof data.detail === 'string'
+        ? data.detail
+        : Array.isArray(data.detail)
+          ? data.detail.map(error => error.msg).join('; ')
+          : `Yêu cầu thất bại (HTTP ${response.status})`;
+      throw new Error(detail);
+    }
 
-  for (let i = 0; i <= 100; i += 5){
-    $('#barFill').style.width = i + '%';
-    $('#progressTxt').textContent = steps[Math.min(Math.floor(i / 25), steps.length - 1)];
-    await sleep(45);
+    if (!Array.isArray(data.results)){
+      throw new Error('Phản hồi từ backend không đúng định dạng');
+    }
+    state.results = data.results.map(comment => ({
+      ...comment,
+      date: comment.publishedAt ? new Date(comment.publishedAt) : null,
+      matched: Array.isArray(comment.matched) ? comment.matched : [],
+    }));
+    renderResults();
+    toast(`Thu thập xong ${state.results.length} bình luận`);
+  }catch(error){
+    toast(`Không thể thu thập: ${error.message}`, 'warn');
+  }finally{
+    $('#progress').classList.remove('on');
+    $('#barFill').style.width = '0%';
+    btn.disabled = false;
   }
-
-  state.results = generateMock();
-  renderResults();
-
-  $('#progress').classList.remove('on');
-  $('#barFill').style.width = '0%';
-  btn.disabled = false;
-  toast(`Thu thập xong ${state.results.length} bình luận`);
 }
 
 function resetForm(){
