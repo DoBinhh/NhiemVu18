@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Comment Collector · Thu thập bình luận</title>
+<style>
+  * { box-sizing: border-box; }
+  :root{
+    --bg:#080d1a; --card:#111a2e; --card2:#16203a; --line:#22304f;
+    --txt:#e9eefb; --muted:#8b9cc0;
+    --accent:#5b8cff; --accent2:#22d3a6; --warn:#ffb020; --danger:#ff5d73;
+    --r:14px;
+  }
+  html,body{height:100%;}
+  body{
+    margin:0; color:var(--txt); font-size:14px; line-height:1.5;
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    background:
+      radial-gradient(1100px 520px at 10% -10%, rgba(91,140,255,.20), transparent 60%),
+      radial-gradient(900px 520px at 92% -5%, rgba(34,211,166,.13), transparent 55%),
+      var(--bg);
+  }
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:#243557;border-radius:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:16px 22px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(17,26,46,.9), rgba(8,13,26,.4));
+    backdrop-filter:blur(8px); position:sticky; top:0; z-index:20;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .logo{
+    width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+    font-weight:800;letter-spacing:.5px;color:#06101f;
+    background:linear-gradient(135deg,#5b8cff,#22d3a6);
+    box-shadow:0 8px 24px rgba(91,140,255,.35);
+  }
+  .brand h1{font-size:16px;margin:0;letter-spacing:.2px;}
+  .brand p{margin:0;font-size:12px;color:var(--muted);}
+  .tag-demo{
+    font-size:11.5px; padding:6px 12px; border-radius:999px;
+    border:1px solid #3a4d78; color:var(--muted); background:#101a2e; white-space:nowrap;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    display:grid; grid-template-columns:minmax(390px,470px) 1fr;
+    gap:18px; padding:18px 22px 48px; align-items:start;
+  }
+  @media (max-width:1080px){ .layout{grid-template-columns:1fr;} }
+
+  .panel{
+    background:linear-gradient(180deg, rgba(22,32,58,.75), rgba(17,26,46,.85));
+    border:1px solid var(--line); border-radius:var(--r);
+    box-shadow:0 18px 40px rgba(0,0,0,.35);
+  }
+  .panel-form{ padding:16px; position:sticky; top:88px; max-height:calc(100vh - 108px); overflow:auto; }
+  @media (max-width:1080px){ .panel-form{position:static; max-height:none;} }
+
+  /* ---------- Fields ---------- */
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  .field-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+  .field-head label, .lbl{font-size:12.5px;font-weight:600;color:#c3d0ea;letter-spacing:.2px;text-transform:uppercase;}
+  .badge{
+    display:inline-block; min-width:22px; text-align:center; font-size:11.5px; font-weight:700;
+    padding:2px 7px; border-radius:999px; color:#06101f;
+    background:linear-gradient(135deg,#5b8cff,#22d3a6);
+  }
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    width:100%; padding:10px 12px; border-radius:10px; color:var(--txt);
+    background:#0c1424; border:1px solid var(--line); font-size:13.5px; font-family:inherit;
+    outline:none; transition:.15s;
+  }
+  input:focus, select:focus{ border-color:#3d64b4; box-shadow:0 0 0 3px rgba(91,140,255,.16); }
+  .row{display:flex;gap:10px;}
+  .row > *{min-width:0;}
+
+  /* ---------- Platform cards ---------- */
+  .platform-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
+  .pf{
+    display:flex; flex-direction:column; gap:2px; padding:10px 11px; cursor:pointer;
+    background:#0c1424; border:1px solid var(--line); border-radius:12px; text-align:left;
+    color:var(--txt); transition:.18s; font-family:inherit;
+  }
+  .pf:hover{border-color:#3a5a96; transform:translateY(-1px);}
+  .pf .pf-top{display:flex;align-items:center;gap:8px;}
+  .pf .ic{
+    width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+    font-size:13px;font-weight:700;color:#05101f;flex:0 0 auto;
+  }
+  .pf b{font-size:13px;font-weight:600;}
+  .pf small{font-size:11px;color:var(--muted);line-height:1.35;}
+  .pf.on{border-color:transparent; background:linear-gradient(135deg, rgba(91,140,255,.22), rgba(34,211,166,.14));
+         box-shadow:0 0 0 1px rgba(91,140,255,.55) inset;}
+
+  /* ---------- Chips ---------- */
+  .chips{
+    display:flex;flex-wrap:wrap;gap:7px;padding:10px;border-radius:10px;
+    background:#0c1424;border:1px solid var(--line);max-height:196px;overflow:auto;
+  }
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
+    background:#131d33;border:1px solid var(--line);color:var(--txt);
+    font-size:12.5px;cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .chip small{font-size:11px;color:var(--muted);}
+  .chip:hover{border-color:#3a5a96;transform:translateY(-1px);}
+  .chip.on{
+    background:linear-gradient(135deg,#5b8cff,#22d3a6); border-color:transparent;
+    color:#06101f; font-weight:700;
+  }
+  .chip.on small{color:#0a1a2c;opacity:.72;}
+  .chip.risky{border-style:dashed;border-color:#6b5220;}
+  .chip.risky.on{border-style:solid;border-color:transparent;}
+
+  .mini{
+    padding:5px 10px;border-radius:8px;font-size:11.5px;cursor:pointer;font-family:inherit;
+    background:#131d33;border:1px solid var(--line);color:#c3d0ea;transition:.15s;
+  }
+  .mini:hover{border-color:#3a5a96;color:#fff;}
+  .add-row{display:flex;gap:8px;margin-top:8px;}
+  .add-row button{
+    padding:10px 14px;border-radius:10px;border:1px solid var(--line);cursor:pointer;
+    background:#16223b;color:#cfe0ff;font-weight:600;font-size:13px;font-family:inherit;white-space:nowrap;
+  }
+  .add-row button:hover{border-color:#3a5a96;}
+
+  /* ---------- Segmented ---------- */
+  .seg{display:flex;gap:6px;padding:4px;background:#0c1424;border:1px solid var(--line);border-radius:11px;}
+  .seg button{
+    flex:1;padding:8px 6px;border-radius:8px;border:0;background:transparent;color:var(--muted);
+    font-size:12.5px;cursor:pointer;font-family:inherit;transition:.15s;
+  }
+  .seg button.on{background:#1d2c4c;color:#fff;font-weight:600;box-shadow:0 0 0 1px #33507f inset;}
+
+  /* ---------- Switch ---------- */
+  .switch{display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;font-size:13px;color:#c8d5ee;}
+  .switch input{display:none;}
+  .track{width:36px;height:20px;border-radius:999px;background:#233253;position:relative;transition:.18s;flex:0 0 auto;}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#8b9cc0;transition:.18s;}
+  .switch input:checked + .track{background:linear-gradient(135deg,#5b8cff,#22d3a6);}
+  .switch input:checked + .track::after{left:18px;background:#04101f;}
+
+  /* ---------- Buttons ---------- */
+  .actions{display:flex;gap:10px;margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);}
+  .btn{
+    padding:12px 18px;border-radius:11px;border:1px solid var(--line);cursor:pointer;
+    background:#16223b;color:#cfe0ff;font-weight:600;font-size:13.5px;font-family:inherit;transition:.18s;
+  }
+  .btn:hover{border-color:#3a5a96;transform:translateY(-1px);}
+  .btn-primary{
+    flex:1;border:0;color:#04101f;font-size:14.5px;font-weight:800;letter-spacing:.3px;
+    background:linear-gradient(135deg,#5b8cff,#22d3a6);
+    box-shadow:0 10px 26px rgba(91,140,255,.32);
+  }
+  .btn-primary:hover{box-shadow:0 14px 32px rgba(34,211,166,.32);}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+
+  /* ---------- Results ---------- */
+  .panel-res{display:flex;flex-direction:column;min-height:520px;overflow:hidden;}
+  .res-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);}
+  .res-head h2{font-size:14px;margin:0;letter-spacing:.2px;}
+  .res-head .sub{font-size:12px;color:var(--muted);}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 16px 0;}
+  @media (max-width:720px){ .stats{grid-template-columns:repeat(2,1fr);} }
+  .stat{background:#0d1728;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .stat .v{font-size:20px;font-weight:800;margin-top:2px;background:linear-gradient(135deg,#8fb0ff,#4de3bb);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  .progress{display:none;padding:14px 16px;gap:10px;flex-direction:column;}
+  .progress.on{display:flex;}
+  .bar{height:8px;border-radius:999px;background:#0d1728;overflow:hidden;border:1px solid var(--line);}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b8cff,#22d3a6);transition:width .18s;}
+  .progress .txt{font-size:12.5px;color:var(--muted);}
+
+  .table-wrap{flex:1;overflow:auto;padding:12px 16px 18px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    position:sticky;top:0;background:#0e1829;text-align:left;font-size:11.5px;letter-spacing:.4px;
+    text-transform:uppercase;color:var(--muted);padding:9px 10px;border-bottom:1px solid var(--line);z-index:2;
+  }
+  tbody td{padding:10px;border-bottom:1px solid #1a2742;vertical-align:top;}
+  tbody tr:hover{background:rgba(91,140,255,.06);}
+  td.txt{max-width:520px;line-height:1.55;}
+  mark{
+    background:rgba(34,211,166,.18); color:#5ef0c6; font-weight:700;
+    padding:0 3px; border-radius:4px; border-bottom:1px solid rgba(34,211,166,.5);
+  }
+  .pf-tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:#b9c8e6;white-space:nowrap;}
+  .m-tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:6px;background:#1a2742;color:#9fe8d4;margin:1px 2px 0 0;}
+  .empty{padding:56px 20px;text-align:center;color:var(--muted);}
+  .empty .big{font-size:34px;opacity:.35;margin-bottom:10px;}
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed;right:20px;bottom:20px;z-index:99;display:flex;flex-direction:column;gap:8px;
+  }
+  .toast div{
+    padding:11px 16px;border-radius:11px;font-size:13px;color:#06101f;font-weight:600;
+    background:linear-gradient(135deg,#8fb0ff,#4de3bb);box-shadow:0 12px 28px rgba(0,0,0,.4);
+    animation:pop .22s ease;
+  }
+  .toast div.warn{background:linear-gradient(135deg,#ffd076,#ffb020);}
+  @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">CC</div>
+    <div>
+      <h1>Comment Collector</h1>
+      <p>Thu thập bình luận chứa từ viết tắt · YouTube · Facebook · TikTok · Shopee · Threads</p>
+    </div>
+  </div>
+  <div class="tag-demo">Giao diện demo · chưa nối backend</div>
+</header>
+
+<main class="layout">
+
+  <!-- ================= FORM ================= -->
+  <section class="panel panel-form">
+
+    <!-- 1. Nền tảng -->
+    <div class="field">
+      <div class="field-head">
+        <label>1. Chọn nền tảng</label>
+        <span style="font-size:11.5px;color:var(--muted)">Mỗi nhóm chọn 1 nền tảng</span>
+      </div>
+      <div class="platform-grid" id="platformGrid"></div>
+    </div>
+
+    <!-- 2. Nguồn dữ liệu -->
+    <div class="field">
+      <div class="field-head"><label>2. Nguồn dữ liệu</label></div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="groupSelect" style="flex:0 0 130px;">
+          <option value="1">Nhóm 1</option>
+          <option value="2">Nhóm 2</option>
+          <option value="3">Nhóm 3</option>
+          <option value="4">Nhóm 4</option>
+          <option value="5">Nhóm 5</option>
+        </select>
+        <input type="text" id="source" placeholder="Link kênh / trang / nhóm / hashtag / từ khoá" />
+      </div>
+    </div>
+
+    <!-- 3. Thời gian -->
+    <div class="field">
+      <div class="field-head">
+        <label>3. Khoảng thời gian</label>
+        <span style="font-size:11.5px;color:var(--muted)">5 năm gần nhất</span>
+      </div>
+      <div class="row">
+        <input type="date" id="fromDate" />
+        <input type="date" id="toDate" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button class="mini" data-range="6m" style="flex:1">6 tháng</button>
+        <button class="mini" data-range="1y" style="flex:1">1 năm</button>
+        <button class="mini" data-range="3y" style="flex:1">3 năm</button>
+        <button class="mini" data-range="5y" style="flex:1">5 năm</button>
+      </div>
+    </div>
+
+    <!-- 4. Từ viết tắt -->
+    <div class="field">
+      <div class="field-head">
+        <label>4. Từ viết tắt cần lọc <span class="badge" id="abbrCount">0</span></label>
+        <div style="display:flex;gap:6px;">
+          <button class="mini" data-preset="basic">Cơ bản</button>
+          <button class="mini" data-preset="full">Mở rộng</button>
+          <button class="mini" data-preset="clear">Bỏ chọn</button>
+        </div>
+      </div>
+      <input type="text" id="abbrSearch" placeholder="Tìm nhanh: ngta, m, cx..." style="margin-bottom:8px;" />
+      <div class="chips" id="abbrList"></div>
+      <div class="add-row">
+        <input type="text" id="abbrNew" placeholder="Thêm từ viết tắt mới (vd: ngta)" />
+        <button id="abbrAdd">+ Thêm</button>
+      </div>
+      <div class="field-head" style="margin:12px 0 6px;">
+        <label>Kiểu khớp</label>
+      </div>
+      <div class="seg" id="matchSeg">
+        <button data-match="word" class="on">Khớp nguyên từ</button>
+        <button data-match="part">Khớp một phần</button>
+      </div>
+    </div>
+
+    <!-- 5. Tuỳ chọn -->
+    <details class="field">
+      <summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:#c3d0ea;text-transform:uppercase;letter-spacing:.3px;">
+        5. Tuỳ chọn nâng cao
+      </summary>
+      <div style="margin-top:10px;">
+        <div class="row" style="margin-bottom:10px;">
+          <div style="flex:1">
+            <div class="lbl" style="margin-bottom:6px;">Số bình luận tối đa</div>
+            <input type="number" id="limit" value="300" min="10" max="5000" step="10" />
+          </div>
+          <div style="flex:1">
+            <div class="lbl" style="margin-bottom:6px;">Sắp xếp</div>
+            <select id="sort">
+              <option value="newest">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
+              <option value="likes">Nhiều tương tác</option>
+            </select>
+          </div>
+        </div>
+        <label class="switch"><input type="checkbox" id="optReplies" checked /><span class="track"></span>Lấy cả bình luận trả lời (replies)</label>
+        <label class="switch"><input type="checkbox" id="optDedup" checked /><span class="track"></span>Loại bỏ bình luận trùng</label>
+        <label class="switch"><input type="checkbox" id="optSkipLinks" checked /><span class="track"></span>Bỏ qua bình luận chứa link (spam)</label>
+      </div>
+    </details>
+
+    <!-- 6. Hành động -->
+    <div class="actions">
+      <button class="btn btn-primary" id="btnCollect">Thu thập</button>
+      <button class="btn" id="btnReset">Làm mới</button>
+      <button class="btn" id="btnExportCfg" title="Xuất cấu hình JSON để gửi cho backend">Cấu hình</button>
+    </div>
+  </section>
+
+  <!-- ================= KẾT QUẢ ================= -->
+  <section class="panel panel-res">
+    <div class="res-head">
+      <div>
+        <h2>Kết quả thu thập</h2>
+        <div class="sub" id="resSub">Chưa có dữ liệu</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="btnExportCsv" style="padding:8px 14px;font-size:12.5px;">Xuất CSV</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Bình luận</div><div class="v" id="stComments">0</div></div>
+      <div class="stat"><div class="k">Có từ viết tắt</div><div class="v" id="stMatched">0</div></div>
+      <div class="stat"><div class="k">Từ phát hiện</div><div class="v" id="stWords">0</div></div>
+      <div class="stat"><div class="k">Tác giả</div><div class="v" id="stAuthors">0</div></div>
+    </div>
+
+    <div class="progress" id="progress">
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="txt" id="progressTxt">Đang chuẩn bị...</div>
+    </div>
+
+    <div class="table-wrap" id="tableWrap">
+      <div class="empty">
+        <div class="big">💬</div>
+        Chọn nền tảng, khoảng thời gian và từ viết tắt<br />rồi bấm <b>Thu thập</b> để bắt đầu.
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   Comment Collector — UI demo
+   Backend API dự kiến: POST /api/collect  (body = state.config)
+   ========================================================= */
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+
+/* ---------- Dữ liệu nền tảng ---------- */
+const PLATFORMS = [
+  { id:'youtube',  name:'YouTube',  icon:'▶', hint:'Video · Shorts · Cộng đồng', color:'#ff4d5e' },
+  { id:'facebook', name:'Facebook', icon:'f', hint:'Fanpage · Nhóm · Bài viết',   color:'#4b8bff' },
+  { id:'tiktok',   name:'TikTok',   icon:'♪', hint:'Video · Bình luận cấp 2',    color:'#2ff0e4' },
+  { id:'shopee',   name:'Shopee',   icon:'S', hint:'Đánh giá sản phẩm',          color:'#ff7a45' },
+  { id:'threads',  name:'Threads',  icon:'@', hint:'Bài đăng · Trả lời',         color:'#c9d4ea' },
+];
+
+/* ---------- Từ viết tắt ---------- */
+const ABBR = [
+  { w:'ngta', m:'người ta' },  { w:'mn',   m:'mọi người' }, { w:'mik',  m:'mình' },
+  { w:'mk',   m:'mình' },      { w:'cx',   m:'cũng' },      { w:'cug',  m:'cũng' },
+  { w:'ko',   m:'không' },     { w:'k',    m:'không' },     { w:'kh',   m:'không' },
+  { w:'hok',  m:'không' },     { w:'đc',   m:'được' },      { w:'dc',   m:'được' },
+  { w:'j',    m:'gì' },        { w:'z',    m:'vậy' },       { w:'vn',   m:'vậy' },
+  { w:'ns',   m:'nói' },       { w:'nx',   m:'nữa' },       { w:'bt',   m:'biết' },
+  { w:'bik',  m:'biết' },      { w:'trc',  m:'trước' },     { w:'tks',  m:'cảm ơn' },
+  { w:'ib',   m:'inbox' },     { w:'rep',  m:'trả lời' },   { w:'stt',  m:'status' },
+  { w:'cmt',  m:'bình luận' }, { w:'vv',   m:'vân vân' },   { w:'lm',   m:'làm' },
+  { w:'r',    m:'rồi' },       { w:'vs',   m:'với' },       { w:'đt',   m:'điện thoại' },
+  { w:'sđt',  m:'số điện thoại' }, { w:'ace', m:'anh chị em' }, { w:'sp', m:'sản phẩm' },
+  { w:'m',    m:'mình / mày' },{ w:'b',    m:'bạn' },       { w:'e',    m:'em' },
+  { w:'a',    m:'anh' },       { w:'ch',   m:'chị' },       { w:'thik', m:'thích' },
+  { w:'ship', m:'giao hàng' }, { w:'auth', m:'hàng chính hãng' }, { w:'fake', m:'hàng giả' },
+  { w:'review', m:'đánh giá' },{ w:'nv',   m:'nhân viên' }, { w:'ok',   m:'ổn' },
+];
+
+const PRESETS = {
+  basic: ['ngta','mn','m','cx','k','ko','đc','dc','j','z','ns','nx','vs','bt','bik','trc','lm','r','ib','rep','tks'],
+  full:  ABBR.map(a => a.w),
+};
+
+/* ---------- State ---------- */
+const state = {
+  platform: 'youtube',
+  group: '1',
+  source: '',
+  selected: new Set(PRESETS.basic),
+  match: 'word',
+  limit: 300,
+  sort: 'newest',
+  results: [],
+};
+
+const today = new Date();
+const dateInput = (d) => d.toISOString().slice(0, 10);
+const min5y = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function renderPlatforms(){
+  $('#platformGrid').innerHTML = PLATFORMS.map(p => `
+    <button class="pf ${state.platform === p.id ? 'on' : ''}" data-pf="${p.id}">
+      <span class="pf-top">
+        <span class="ic" style="background:${p.color}">${p.icon}</span>
+        <b>${p.name}</b>
+      </span>
+      <small>${p.hint}</small>
+    </button>`).join('');
+
+  $$('#platformGrid .pf').forEach(btn => {
+    btn.onclick = () => { state.platform = btn.dataset.pf; renderPlatforms(); };
+  });
+}
+
+function renderAbbr(filter = ''){
+  const f = filter.trim().toLowerCase();
+  const list = ABBR.filter(a => !f || a.w.includes(f) || a.m.includes(f));
+
+  $('#abbrList').innerHTML = list.map(a => `
+    <button class="chip ${state.selected.has(a.w) ? 'on' : ''} ${a.w.length === 1 ? 'risky' : ''}"
+            data-w="${a.w}" title="${a.w.length === 1 ? 'Từ 1 ký tự — dễ khớp nhầm, nên dùng chế độ Khớp nguyên từ' : a.m}">
+      ${a.w} <small>${a.m}</small>
+    </button>`).join('') || `<span style="color:var(--muted);font-size:12.5px;padding:4px">Không tìm thấy từ nào phù hợp.</span>`;
+
+  $$('#abbrList .chip').forEach(chip => {
+    chip.onclick = () => {
+      const w = chip.dataset.w;
+      state.selected.has(w) ? state.selected.delete(w) : state.selected.add(w);
+      renderAbbr($('#abbrSearch').value);
+      updateCount();
+    };
+  });
+  updateCount();
+}
+
+function updateCount(){
+  $('#abbrCount').textContent = state.selected.size;
+}
+
+/* =========================================================
+   TIỆN ÍCH LỌC
+   ========================================================= */
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function buildRegex(words, mode = 'word'){
+  const list = [...words].sort((a, b) => b.length - a.length).map(escRe).join('|');
+  if (!list) return null;
+  const body = mode === 'word'
+    ? `(?<![\\p{L}\\p{N}])(${list})(?![\\p{L}\\p{N}])`
+    : `(${list})`;
+  try { return new RegExp(body, 'giu'); }
+  catch { return new RegExp(body, 'gi'); }
+}
+
+function escHtml(s){
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function findWords(text, re){
+  if (!re) return [];
+  const found = new Set();
+  let m; re.lastIndex = 0;
+  while ((m = re.exec(text)) !== null){
+    found.add(m[0].toLowerCase());
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return [...found];
+}
+
+function highlight(text, words){
+  if (!words.length) return escHtml(text);
+  const re = buildRegex(words, 'part');
+  if (!re) return escHtml(text);
+  let out = '', last = 0, m;
+  while ((m = re.exec(text)) !== null){
+    out += escHtml(text.slice(last, m.index));
+    out += `<mark>${escHtml(m[0])}</mark>`;
+    last = m.index + m[0].length;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return out + escHtml(text.slice(last));
+}
+
+/* =========================================================
+   DỮ LIỆU MINH HOẠ (thay bằng dữ liệu API thật)
+   ========================================================= */
+const SAMPLE = [
+  { author:'linh.nguyen',   text:'ngta có nhà lầu xe hơi rồi nên cx chả cần mấy cái này đâu mn ạ', likes:128 },
+  { author:'tuan.anh97',    text:'sp này dùng có đc ko shop? e đang tính mua mà sợ hok hợp da', likes:64 },
+  { author:'mythu.2402',    text:'mn ơi cho m hỏi cái này vs ạ, m mới tập tành lm video thôi', likes:41 },
+  { author:'hoangnam',      text:'ns thật là m thấy cái này ko đáng tiền, đc cái mã đẹp thôi', likes:203 },
+  { author:'quynh.bui',     text:'trc đây mik cx dùng r, ns chung là ổn trong tầm giá này', likes:87 },
+  { author:'shopreview.vn', text:'ib shop để đc tư vấn thêm nha, rep nhanh lắm luôn', likes:12 },
+  { author:'kiet.tran',     text:'j z trời, giá này mà cx bán đc à, ngta mua chỗ khác rẻ hơn nhiều', likes:311 },
+  { author:'haianh.9x',     text:'theo mik thì mn nên đọc kỹ stt trc khi mua nha, kẻo tiếc tiền', likes:55 },
+  { author:'vminh.channel', text:'bik j đâu, cứ thử đi r bik, tks shop đã tư vấn nhiệt tình', likes:9 },
+  { author:'ngocdiep',      text:'hok có tiền mua đt mới nên m dùng tạm cái này, cx bt thôi mn', likes:76 },
+  { author:'long.nguyen',   text:'ace cho e hỏi sđt shop vs, e gọi mà ko đc ai bắt máy', likes:3 },
+  { author:'thuylinh98',    text:'@user rep cmt của m đi, đợi mãi chả thấy trả lời j cả', likes:18 },
+  { author:'bichngoc.shop', text:'này là hàng fake hay auth z shop, mn cho mik xin review vs', likes:142 },
+  { author:'duy.manh',      text:'mình thấy giá này quá cao so vs chất lượng, nx thêm là ship hơi lâu', likes:98 },
+  { author:'trang.pt',      text:'shop ơi sp này còn hàng ko, e đặt 2 cái đc ko ạ', likes:7 },
+  { author:'anhtuan.dev',   text:'coi xong clip mà thấy ns xàm, k hay j cả, phí thời gian', likes:64 },
+  { author:'lethuong',      text:'ai bk mua ở đâu rẻ ko, chỉ mik vs, đang cần gấp', likes:22 },
+  { author:'phuong.thaovn', text:'mn ơi cái này dùng oke trong tầm giá, nên thử nha ace', likes:133 },
+  { author:'minhchau.2k',   text:'thik cái tone màu này ghê, đc cái lên hình xinh cực mn ạ', likes:290 },
+  { author:'tien.dat',      text:'đt gì mà pin tụt như tụt quần, hok đáng mua đâu mn, đừng phí tiền', likes:410 },
+  { author:'huyhoang.k',    text:'mua ở đây lần 2 r, ship nhanh, nv tư vấn cx dễ thương', likes:35 },
+  { author:'nga.pham',      text:'mn cho e xin link vs ạ, e tìm mãi hok thấy chỗ bán', likes:11 },
+];
+
+function generateMock(){
+  const re = buildRegex(state.selected, state.match);
+  const skipLinks = $('#optSkipLinks').checked;
+  const dedup = $('#optDedup').checked;
+
+  let out = [];
+  const seen = new Set();
+
+  SAMPLE.forEach((c, i) => {
+    if (skipLinks && /https?:\/\/|www\./i.test(c.text)) return;
+    const words = findWords(c.text, re);
+    if (!words.length) return;
+    if (dedup){
+      const key = c.text.toLowerCase().trim();
+      if (seen.has(key)) return;
+      seen.add(key);
+    }
+    const d = new Date(min5y.getTime() + Math.random() * (today.getTime() - min5y.getTime()));
+    out.push({
+      id: i + 1,
+      author: c.author,
+      text: c.text,
+      likes: c.likes,
+      matched: words,
+      platform: state.platform,
+      date: d,
+    });
+  });
+
+  if (state.sort === 'newest') out.sort((a, b) => b.date - a.date);
+  if (state.sort === 'oldest') out.sort((a, b) => a.date - b.date);
+  if (state.sort === 'likes')  out.sort((a, b) => b.likes - a.likes);
+
+  return out.slice(0, Math.min(Number($('#limit').value) || 300, 200));
+}
+
+/* =========================================================
+   RENDER KẾT QUẢ
+   ========================================================= */
+const fmtDate = (d) =>
+  `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+function renderResults(){
+  const wrap = $('#tableWrap');
+  const pf = PLATFORMS.find(p => p.id === state.platform);
+
+  if (!state.results.length){
+    wrap.innerHTML = `<div class="empty"><div class="big">🔍</div>
+      Không tìm thấy bình luận nào chứa từ viết tắt đã chọn.<br />
+      Thử bớt từ khoá, đổi sang <b>Khớp một phần</b> hoặc mở rộng khoảng thời gian.
+    </div>`;
+    $('#resSub').textContent = '0 bình luận phù hợp';
+    updateStats();
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th style="width:38px">#</th>
+          <th style="width:120px">Tác giả</th>
+          <th style="width:96px">Thời gian</th>
+          <th>Nội dung bình luận</th>
+          <th style="width:150px">Từ viết tắt</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${state.results.map((r, i) => `
+          <tr>
+            <td style="color:var(--muted)">${i + 1}</td>
+            <td>
+              <div style="font-weight:600">${escHtml(r.author)}</div>
+              <span class="pf-tag">${pf.name}</span>
+            </td>
+            <td style="color:var(--muted);font-size:12px">${fmtDate(r.date)}</td>
+            <td class="txt">${highlight(r.text, r.matched)}</td>
+            <td>${r.matched.map(w => `<span class="m-tag">${escHtml(w)}</span>`).join('')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  $('#resSub').textContent =
+    `${state.results.length} bình luận · ${pf.name} · Nhóm ${state.group} · ${$('#fromDate').value} → ${$('#toDate').value}`;
+
+  updateStats();
+}
+
+function updateStats(){
+  $('#stComments').textContent = state.results.length;
+  $('#stMatched').textContent  = state.results.length;
+  const words = new Set();
+  state.results.forEach(r => r.matched.forEach(w => words.add(w)));
+  $('#stWords').textContent = words.size;
+  $('#stAuthors').textContent = new Set(state.results.map(r => r.author)).size;
+}
+
+/* =========================================================
+   HÀNH ĐỘNG
+   ========================================================= */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function collect(){
+  if (!state.selected.size){
+    toast('Hãy chọn ít nhất 1 từ viết tắt để lọc', 'warn');
+    return;
+  }
+  if (!$('#fromDate').value || !$('#toDate').value){
+    toast('Vui lòng chọn khoảng thời gian', 'warn');
+    return;
+  }
+
+  state.group  = $('#groupSelect').value;
+  state.source = $('#source').value.trim();
+  state.limit  = Number($('#limit').value) || 300;
+  state.sort   = $('#sort').value;
+
+  const btn = $('#btnCollect');
+  btn.disabled = true;
+  $('#progress').classList.add('on');
+
+  const steps = [
+    'Đang xác thực nguồn dữ liệu...',
+    `Đang thu thập bình luận từ ${PLATFORMS.find(p => p.id === state.platform).name}...`,
+    'Đang lọc bình luận chứa từ viết tắt...',
+    'Đang loại bỏ trùng lặp & spam...',
+    'Hoàn tất!',
+  ];
+
+  for (let i = 0; i <= 100; i += 5){
+    $('#barFill').style.width = i + '%';
+    $('#progressTxt').textContent = steps[Math.min(Math.floor(i / 25), steps.length - 1)];
+    await sleep(45);
+  }
+
+  state.results = generateMock();
+  renderResults();
+
+  $('#progress').classList.remove('on');
+  $('#barFill').style.width = '0%';
+  btn.disabled = false;
+  toast(`Thu thập xong ${state.results.length} bình luận`);
+}
+
+function resetForm(){
+  state.platform = 'youtube';
+  state.selected = new Set(PRESETS.basic);
+  state.results = [];
+  $('#source').value = '';
+  $('#abbrSearch').value = '';
+  $('#abbrNew').value = '';
+  $('#limit').value = 300;
+  $('#sort').value = 'newest';
+  $('#optReplies').checked = true;
+  $('#optDedup').checked = true;
+  $('#optSkipLinks').checked = true;
+  $('#fromDate').value = dateInput(min5y);
+  $('#toDate').value = dateInput(today);
+  renderPlatforms();
+  renderAbbr();
+  updateStats();
+  $('#tableWrap').innerHTML = `<div class="empty"><div class="big">💬</div>
+    Chọn nền tảng, khoảng thời gian và từ viết tắt<br />rồi bấm <b>Thu thập</b> để bắt đầu.</div>`;
+  $('#resSub').textContent = 'Chưa có dữ liệu';
+}
+
+/* ---------- Xuất dữ liệu ---------- */
+function configObject(){
+  return {
+    group: state.group,
+    platform: state.platform,
+    source: state.source,
+    dateRange: { from: $('#fromDate').value, to: $('#toDate').value },
+    abbreviations: [...state.selected],
+    matchMode: state.match,
+    limit: Number($('#limit').value) || 300,
+    sort: $('#sort').value,
+    options: {
+      includeReplies: $('#optReplies').checked,
+      removeDuplicates: $('#optDedup').checked,
+      skipLinks: $('#optSkipLinks').checked,
+    },
+  };
+}
+
+function download(filename, content, type = 'application/json'){
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCsv(){
+  if (!state.results.length){ toast('Chưa có dữ liệu để xuất', 'warn'); return; }
+  const head = ['STT','Nen tang','Tac gia','Thoi gian','Noi dung','Tu viet tat','Luot thich'];
+  const rows = state.results.map((r, i) => [
+    i + 1,
+    PLATFORMS.find(p => p.id === r.platform).name,
+    r.author,
+    fmtDate(r.date),
+    `"${r.text.replace(/"/g, '""')}"`,
+    `"${r.matched.join(', ')}"`,
+    r.likes,
+  ].join(','));
+  download(`comments-${state.platform}-${Date.now()}.csv`, '\uFEFF' + [head.join(','), ...rows].join('\n'), 'text/csv;charset=utf-8');
+  toast('Đã xuất file CSV');
+}
+
+/* ---------- Toast ---------- */
+function toast(msg, type = ''){
+  const el = document.createElement('div');
+  if (type) el.className = type;
+  el.textContent = msg;
+  $('#toast').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* =========================================================
+   KHỞI TẠO & SỰ KIỆN
+   ========================================================= */
+function init(){
+  renderPlatforms();
+  renderAbbr();
+
+  $('#fromDate').value = dateInput(min5y);
+  $('#toDate').value = dateInput(today);
+
+  // Preset khoảng thời gian
+  $$('[data-range]').forEach(btn => {
+    btn.onclick = () => {
+      const y = { '6m': 0.5, '1y': 1, '3y': 3, '5y': 5 }[btn.dataset.range];
+      const from = new Date(today.getFullYear() - Math.floor(y), today.getMonth() - (y % 1 ? 6 : 0), today.getDate());
+      $('#fromDate').value = dateInput(from);
+      $('#toDate').value = dateInput(today);
+    };
+  });
+
+  // Preset từ viết tắt
+  $$('[data-preset]').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.preset;
+      if (p === 'clear') state.selected.clear();
+      else state.selected = new Set(PRESETS[p]);
+      renderAbbr($('#abbrSearch').value);
+    };
+  });
+
+  // Tìm & thêm từ viết tắt
+  $('#abbrSearch').oninput = (e) => renderAbbr(e.target.value);
+  $('#abbrAdd').onclick = addNewAbbr;
+  $('#abbrNew').onkeydown = (e) => { if (e.key === 'Enter') addNewAbbr(); };
+
+  function addNewAbbr(){
+    const w = $('#abbrNew').value.trim().toLowerCase();
+    if (!w) return;
+    if (!ABBR.some(a => a.w === w)) ABBR.push({ w, m: 'từ tự thêm' });
+    state.selected.add(w);
+    $('#abbrNew').value = '';
+    renderAbbr($('#abbrSearch').value);
+    toast(`Đã thêm "${w}"`);
+  }
+
+  // Kiểu khớp
+  $$('#matchSeg button').forEach(btn => {
+    btn.onclick = () => {
+      state.match = btn.dataset.match;
+      $$('#matchSeg button').forEach(b => b.classList.toggle('on', b === btn));
+    };
+  });
+
+  // Hành động
+  $('#btnCollect').onclick = collect;
+  $('#btnReset').onclick = resetForm;
+  $('#btnExportCsv').onclick = exportCsv;
+  $('#btnExportCfg').onclick = () => {
+    download('collect-config.json', JSON.stringify(configObject(), null, 2));
+    toast('Đã xuất cấu hình JSON');
+  };
+}
+
+init();
+</script>
+</body>
+</html>
